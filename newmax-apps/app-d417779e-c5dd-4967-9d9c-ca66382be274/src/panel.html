@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>磁盘监控与清理</title>
+  <link rel="stylesheet" href="./panel.css" />
+</head>
+<body>
+  <div id="panelApp" class="md-shell">
+    <!-- MD3 Top App Bar + Linear Progress + Primary Tabs -->
+    <header class="md-top-bar">
+      <div class="md-bar-row">
+        <div class="md-hero">
+          <div class="md-hero-main">
+            <span id="heroPct" class="md-headline">--%</span>
+            <span id="statusPill" class="md-assist-badge">正常</span>
+          </div>
+          <div class="md-hero-sub">
+            <span id="heroUsage" class="md-body-sm">读取本机磁盘...</span>
+            <span id="heroUpdated" class="md-label-sm">等待同步</span>
+          </div>
+        </div>
+
+        <button id="btnScanAll" type="button" class="md-btn md-btn-tonal md-btn-sm" title="立即重新采集磁盘空间并扫描可清理条目">
+          <svg class="md-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.1A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+          <span id="btnScanLabel">扫描</span>
+        </button>
+      </div>
+
+      <!-- MD3 Linear Progress Indicator -->
+      <div class="md-progress-track" aria-hidden="true">
+        <div id="heroMeterFill" class="md-progress-indicator" style="width: 0%;"></div>
+      </div>
+
+      <!-- MD3 Segmented Button / Navigation Tabs -->
+      <nav class="md-segmented" role="tablist" aria-label="功能分区">
+        <button type="button" class="md-seg-btn active" role="tab" aria-selected="true" data-tab="cleanup">
+          <span>可清理</span>
+          <span id="tabCleanCount" class="md-count-pill">0</span>
+        </button>
+        <button type="button" class="md-seg-btn" role="tab" aria-selected="false" data-tab="overview">
+          <span>磁盘概览</span>
+        </button>
+        <button type="button" class="md-seg-btn" role="tab" aria-selected="false" data-tab="settings">
+          <span>设置</span>
+        </button>
+      </nav>
+    </header>
+
+    <!-- Main Scrollable Viewport -->
+    <main class="md-body">
+      <!-- TAB 1: Cleanup Candidates -->
+      <section id="tab-cleanup" class="md-tab-panel active" role="tabpanel" aria-label="可清理清单">
+        <!-- MD3 Filled Summary Card -->
+        <div class="md-card md-card-filled summary-card">
+          <div class="summary-top">
+            <div class="summary-stat">
+              <span class="md-label-md">可安全释放空间</span>
+              <strong id="cleanableTotal" class="md-title-lg">0 MB</strong>
+            </div>
+            <button id="btnToggleProtected" type="button" class="md-chip md-chip-protected" aria-expanded="false">
+              <svg class="md-ico-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm-1 14-3.5-3.5 1.41-1.41L11 13.17l4.59-4.59L17 10l-6 6z"/></svg>
+              <span id="protectedSummaryText">已保护依赖缓存</span>
+            </button>
+          </div>
+
+          <div id="protectedDrawer" class="protected-drawer" hidden>
+            <div class="protected-drawer-head">
+              <strong>受保护的项目依赖与打包缓存（绝不清理）</strong>
+              <span class="md-label-sm">含 node_modules、.venv 等</span>
+            </div>
+            <div id="protectedList" class="protected-list"></div>
+          </div>
+        </div>
+
+        <!-- Service Permission / Sandbox Notice Banner (only shown if needed) -->
+        <div id="serviceAlertBanner" class="md-banner md-banner-warn" role="alert" hidden></div>
+
+        <!-- Action Feedback Snackbar-style Banner -->
+        <div id="cleanupFeedback" class="md-banner" role="status" hidden></div>
+
+        <!-- MD3 Filter Chips Row -->
+        <div id="catFilterBar" class="md-chip-row" role="group" aria-label="按清理类别筛选"></div>
+
+        <!-- MD3 Search Bar + Selection Controls -->
+        <div class="md-search-row">
+          <div class="md-search-box">
+            <svg class="md-ico-sm search-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            <input id="searchInput" type="search" class="md-search-input" placeholder="筛选项目、文件名或路径..." aria-label="筛选可清理条目" />
+          </div>
+          <button id="btnSelectVisible" type="button" class="md-btn md-btn-text md-btn-xs">全选</button>
+          <button id="btnClearSelect" type="button" class="md-btn md-btn-text md-btn-xs">取消</button>
+        </div>
+
+        <!-- MD3 List Surface -->
+        <div id="cleanupList" class="md-list" role="list">
+          <div class="md-empty">正在读取本机可清理清单...</div>
+        </div>
+      </section>
+
+      <!-- TAB 2: Disk 2.5D Overview -->
+      <section id="tab-overview" class="md-tab-panel" role="tabpanel" aria-label="磁盘概览" hidden>
+        <div class="md-card md-card-outlined iso-card">
+          <div class="iso-card-head">
+            <span class="md-mono-tag">FIG 1 · APFS DISK3</span>
+            <span id="isoReadout" class="md-mono-tag md-mono-live">--</span>
+          </div>
+          <div id="panelIsoStage" class="iso-stage-box" title="点击 2.5D 盘片切换分卷"></div>
+        </div>
+
+        <div class="md-section-title">APFS 分卷明细（点击切换焦点）</div>
+        <div id="volumeList" class="md-vol-list"></div>
+      </section>
+
+      <!-- TAB 3: Settings -->
+      <section id="tab-settings" class="md-tab-panel" role="tabpanel" aria-label="监控与清理设置" hidden>
+        <form id="settingsForm" class="md-settings-form">
+          <div class="md-card md-card-outlined setting-card">
+            <div class="setting-head">
+              <label for="setInterval" class="md-title-sm">自动采集周期</label>
+              <span class="md-label-sm">同步作用于信息面板与侧边栏</span>
+            </div>
+            <select id="setInterval" class="md-select">
+              <option value="5">每 5 秒采集</option>
+              <option value="15">每 15 秒采集</option>
+              <option value="30">每 30 秒采集</option>
+              <option value="0">暂停自动采集（仅手动扫描）</option>
+            </select>
+          </div>
+
+          <div class="md-card md-card-outlined setting-card">
+            <div class="setting-head">
+              <label for="setThreshold" class="md-title-sm">磁盘占用预警阈值</label>
+              <strong id="setThresholdVal" class="md-mono-val">80%</strong>
+            </div>
+            <input id="setThreshold" type="range" min="50" max="95" step="1" value="80" class="md-slider" />
+            <div class="md-slider-scale"><span>50%</span><span>75%</span><span>95%</span></div>
+          </div>
+
+          <div class="md-card md-card-outlined setting-card">
+            <div class="setting-head">
+              <label for="setKeepVersions" class="md-title-sm">历史版本包保留份数</label>
+              <span class="md-label-sm">同系列打包产物自动保留最新</span>
+            </div>
+            <select id="setKeepVersions" class="md-select">
+              <option value="1">保留最新 1 个版本（清理更早历史包）</option>
+              <option value="2">保留最新 2 个版本</option>
+              <option value="3">保留最新 3 个版本</option>
+            </select>
+          </div>
+
+          <div class="md-card md-card-outlined setting-card">
+            <div class="setting-head">
+              <label for="setMinSize" class="md-title-sm">列表最小体积过滤</label>
+              <span class="md-label-sm">隐藏零碎小文件</span>
+            </div>
+            <select id="setMinSize" class="md-select">
+              <option value="1">≥ 1 MB</option>
+              <option value="10">≥ 10 MB</option>
+              <option value="50">≥ 50 MB</option>
+            </select>
+          </div>
+
+          <div class="md-card md-card-outlined setting-card">
+            <div class="setting-head">
+              <span class="md-title-sm">常规清理扫描范围</span>
+              <span class="md-label-sm">始终硬保护项目依赖缓存</span>
+            </div>
+            <label class="md-switch-row">
+              <input id="setIncludeAppCaches" type="checkbox" checked />
+              <span class="md-switch-track" aria-hidden="true"></span>
+              <span class="md-switch-label">扫描常规应用与浏览器缓存（Caches / Code Cache / GPUCache / 沙盒缓存）</span>
+            </label>
+            <label class="md-switch-row">
+              <input id="setIncludeDownloadLarge" type="checkbox" checked />
+              <span class="md-switch-track" aria-hidden="true"></span>
+              <span class="md-switch-label">列出下载目录大文件与大文件夹（≥ 50 MB，供人工核对后清理）</span>
+            </label>
+          </div>
+
+          <div class="md-card md-card-outlined setting-card">
+            <div class="setting-head">
+              <label for="setScanRoots" class="md-title-sm">扫描根目录（每行一个路径）</label>
+              <span class="md-label-sm">用于项目打包临时产物、历史版本与下载日志</span>
+            </div>
+            <textarea id="setScanRoots" class="md-textarea" rows="3" spellcheck="false"></textarea>
+          </div>
+
+          <div class="settings-actions">
+            <button id="btnSaveSettings" type="submit" class="md-btn md-btn-filled">保存设置并重新扫描</button>
+            <button id="btnResetSettings" type="button" class="md-btn md-btn-outlined">恢复默认</button>
+          </div>
+          <div id="settingsFeedback" class="md-banner" role="status" hidden></div>
+        </form>
+
+        <div class="md-card md-card-filled service-card">
+          <div class="setting-head">
+            <span class="md-title-sm">本地采集与清理服务</span>
+            <span id="serviceStatusText" class="md-mono-val">检测中...</span>
+          </div>
+          <p class="md-body-sm">采集服务只扫描，不删除文件。可清理列表只显示能直接移入废纸篓的条目（含 .next 等普通点开头构建目录）。受保护路径（如 .git、.env、依赖缓存、资源库非缓存/日志目录）、含链接或超过 4000 项的文件夹不会出现在列表里。</p>
+          <div class="service-actions">
+            <button id="btnStopService" type="button" class="md-btn md-btn-outlined md-btn-sm">安全停止后台服务</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer id="cleanupFooter" class="md-bottom-bar" hidden>
+      <div id="footerNormalRow" class="md-bottom-row">
+        <div class="md-bottom-stat">
+          <span id="selectedCountText" class="md-label-md">已选 0 项</span>
+          <strong id="selectedSizeText" class="md-title-sm md-mono-val">0 MB</strong>
+          <span id="grantStatusText" class="md-label-sm">点右侧按钮移入废纸篓</span>
+        </div>
+        <div class="md-bottom-actions">
+          <button id="btnRequestClean" type="button" class="md-btn md-btn-danger md-btn-sm">
+            <svg class="md-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+            <span>移至废纸篓</span>
+          </button>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script src="./iso-disk.js"></script>
+  <script src="./panel.js"></script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>磁盘监控</title>
+  <link rel="stylesheet" href="./boot.css" />
+</head>
+<body>
+  <main class="boot">
+    <header class="boot-bar">
+      <div>
+        <p class="boot-kicker">采集服务</p>
+        <h1>磁盘监控</h1>
+      </div>
+      <span id="servicePill" class="pill">检测中</span>
+    </header>
+
+    <section class="metric" aria-live="polite">
+      <strong id="usedPct">--%</strong>
+      <p id="usageLine">正在读取本机磁盘…</p>
+      <div class="meter" aria-hidden="true"><span id="meterFill"></span></div>
+    </section>
+
+    <section class="note">
+      <h2>日常清理在侧边栏</h2>
+      <p>这个小窗口只负责让宿主启动本机采集服务。勾选并移入废纸篓，请用左侧「磁盘监控与清理」。关掉窗口不会停止服务。</p>
+    </section>
+
+    <p id="detailLine" class="detail">等待服务就绪…</p>
+  </main>
+  <script src="./iso-disk.js"></script>
+  <script src="./boot.js"></script>
+</body>
+</html>

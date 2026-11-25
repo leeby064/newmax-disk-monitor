@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>磁盘线框监控 · 信息面板</title>
+  <style>
+    :root {
+      --body: transparent;
+      --deck: transparent;
+      --line: rgba(100, 116, 139, 0.75);
+      --detail: rgba(148, 163, 184, 0.65);
+      --brand: #1e293b;
+      --accent: #1e293b;
+      --accent-soft: rgba(30, 41, 59, 0.08);
+      --live: #0f172a;
+      --warn: #d97706;
+      --warn-soft: rgba(217, 119, 6, 0.14);
+      --ok: #334155;
+      --text-main: #0f172a;
+      --text-sub: #475569;
+      --text-muted: #64748b;
+      --pill-bg: rgba(148, 163, 184, 0.1);
+      --pill-border: rgba(100, 116, 139, 0.25);
+      --pill-active-bg: rgba(15, 23, 42, 0.1);
+      --pill-active-text: #0f172a;
+      --mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --body: transparent;
+        --deck: transparent;
+        --line: rgba(228, 228, 231, 0.88);
+        --detail: rgba(212, 212, 216, 0.72);
+        --brand: #f4f4f5;
+        --accent: #f4f4f5;
+        --accent-soft: rgba(244, 244, 245, 0.14);
+        --live: #ffffff;
+        --warn: #f59e0b;
+        --warn-soft: rgba(245, 158, 11, 0.18);
+        --ok: #e4e4e7;
+        --text-main: #f4f4f5;
+        --text-sub: #a1a1aa;
+        --text-muted: #71717a;
+        --pill-bg: rgba(244, 244, 245, 0.10);
+        --pill-border: rgba(212, 212, 216, 0.36);
+        --pill-active-bg: rgba(244, 244, 245, 0.20);
+        --pill-active-text: #ffffff;
+      }
+    }
+
+    /* Strict host inline info-card rules: transparent background, zero outer margin/padding */
+    html,
+    body,
+    #app {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      box-sizing: border-box;
+      overflow: hidden;
+      font-family: var(--sans);
+      color: var(--text-main);
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 160px;
+      max-height: 160px;
+    }
+
+    /* Row 1: Fig N caption header (aligned with left/right edges) */
+    .fig-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 18px;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      color: var(--text-sub);
+    }
+
+    .fig-tag {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .fig-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 9.5px;
+      font-weight: 600;
+      border: 1px solid var(--pill-border);
+      background: var(--pill-bg);
+      color: var(--text-main);
+    }
+
+    .fig-status-badge.warn {
+      background: var(--warn-soft);
+      border-color: var(--warn);
+      color: var(--warn);
+    }
+
+    .status-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--ok);
+    }
+
+    .fig-status-badge.warn .status-dot {
+      background: var(--warn);
+    }
+
+    /* Row 2: Main 2.5D Isometric Stage + Telemetry Column */
+    .inline-main {
+      display: grid;
+      grid-template-columns: 118px minmax(0, 1fr);
+      gap: 6px;
+      align-items: center;
+      height: 120px;
+      min-height: 0;
+    }
+
+    .iso-stage-wrap {
+      position: relative;
+      width: 118px;
+      height: 118px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .iso-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      overflow: visible;
+      outline: none;
+    }
+
+    /* iso-figure required CSS classes */
+    .face {
+      fill: var(--body);
+      stroke: var(--line);
+      stroke-width: 0.95;
+      vector-effect: non-scaling-stroke;
+      stroke-linejoin: round;
+    }
+
+    .face.top {
+      fill: var(--deck);
+    }
+
+    .face.live-box {
+      stroke: var(--accent);
+      stroke-width: 1.35;
+    }
+
+    .face.top.live-box {
+      fill: var(--accent-soft);
+    }
+
+    .face.key-active {
+      fill: var(--accent-soft);
+      stroke: var(--accent);
+      stroke-width: 0.95;
+    }
+
+    .detail {
+      fill: none;
+      stroke: var(--detail);
+      stroke-width: 0.75;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .detail-recess {
+      fill: none;
+      stroke: var(--detail);
+      stroke-width: 0.65;
+      stroke-dasharray: 2 2;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .detail.live-line {
+      stroke: var(--live);
+      stroke-width: 0.85;
+    }
+
+    .cage-wire {
+      fill: none;
+      stroke: var(--detail);
+      stroke-width: 0.45;
+      stroke-dasharray: 2.5 2;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .meter-fill,
+    .sector-bar {
+      fill: var(--detail);
+      stroke: none;
+    }
+
+    .meter-fill.live-fill,
+    .sector-bar.live-fill {
+      fill: var(--accent);
+    }
+
+    .arc-live {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 0.9;
+      stroke-linecap: round;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .led-dot.ok {
+      fill: var(--ok);
+    }
+
+    .led-dot.warn {
+      fill: var(--warn);
+    }
+
+    .iso-plate-label,
+    .iso-chip-text,
+    .iso-slab-label,
+    .iso-slab-sub,
+    .iso-key-text,
+    .iso-cage-label {
+      font-family: var(--mono);
+      fill: var(--text-sub);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      pointer-events: none;
+    }
+
+    .live-text {
+      fill: var(--live);
+      font-weight: 700;
+    }
+
+    .press {
+      cursor: pointer;
+      transition: transform 60ms ease-out;
+    }
+
+    .press:hover .face {
+      stroke: var(--live);
+    }
+
+    .press.down,
+    .press.active {
+      transform: translateY(2.5px);
+    }
+
+    .press.down .face,
+    .press.active .face {
+      stroke: var(--live);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .press {
+        transition: none;
+      }
+    }
+
+    /* Right column telemetry */
+    .telemetry-col {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 114px;
+      min-width: 0;
+    }
+
+    .metric-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 4px;
+    }
+
+    .metric-pct {
+      font-family: var(--mono);
+      font-size: 21px;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.03em;
+      color: var(--text-main);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric-layer-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .metric-sub {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      color: var(--text-sub);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Linear wireframe progress bar */
+    .wire-bar-track {
+      width: 100%;
+      height: 6px;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      padding: 1px;
+      background: transparent;
+    }
+
+    .wire-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 1px;
+      transition: width 140ms ease;
+    }
+
+    .wire-bar-fill.warn {
+      background: var(--warn);
+    }
+
+    /* Layer switch buttons (2x2 compact grid) */
+    .layer-pills {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 3px;
+    }
+
+    .layer-btn {
+      appearance: none;
+      border: 1px solid var(--pill-border);
+      background: var(--pill-bg);
+      color: var(--text-main);
+      border-radius: 4px;
+      height: 21px;
+      padding: 0 5px;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: border-color 100ms ease, background 100ms ease;
+    }
+
+    .layer-btn:hover,
+    .layer-btn:focus-visible {
+      border-color: var(--live);
+      outline: none;
+    }
+
+    .layer-btn.active {
+      background: var(--pill-active-bg);
+      color: var(--pill-active-text);
+      border-color: var(--live);
+    }
+
+    .layer-btn-pct {
+      opacity: 0.8;
+      font-size: 9.5px;
+    }
+
+    /* Row 3: Bottom Fig N monospace live readout + scan trigger */
+    .fig-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 18px;
+      border-top: 1px dashed var(--pill-border);
+      padding-top: 2px;
+      font-family: var(--mono);
+      font-size: 9.5px;
+      color: var(--text-sub);
+      gap: 4px;
+    }
+
+    .fig-readout {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text-main);
+      font-weight: 500;
+    }
+
+    .scan-mini-btn {
+      appearance: none;
+      border: 1px solid var(--pill-border);
+      background: transparent;
+      color: var(--text-main);
+      border-radius: 3px;
+      padding: 0 4px;
+      height: 15px;
+      font-family: var(--mono);
+      font-size: 8.5px;
+      font-weight: 600;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .scan-mini-btn:hover,
+    .scan-mini-btn:focus-visible {
+      border-color: var(--live);
+      color: var(--accent);
+      outline: none;
+    }
+
+    .interval-toggle {
+      appearance: none;
+      border: 1px solid var(--pill-border);
+      background: transparent;
+      color: var(--text-sub);
+      border-radius: 3px;
+      padding: 0 3px;
+      height: 15px;
+      font-family: var(--mono);
+      font-size: 8.5px;
+      font-weight: 600;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .interval-toggle:hover {
+      border-color: var(--line);
+      color: var(--text-main);
+    }
+  </style>
+</head>
+<body>
+  <main id="app" data-local-app-inline-root>
+    <header class="fig-header">
+      <span class="fig-tag">Fig 1 · APFS DISK3</span>
+      <span id="statusBadge" class="fig-status-badge">
+        <span class="status-dot"></span>
+        <span id="statusText">余 198G</span>
+      </span>
+    </header>
+
+    <section class="inline-main">
+      <div id="isoStage" class="iso-stage-wrap" title="点击 2.5D 盘片切换分卷"></div>
+
+      <div class="telemetry-col">
+        <div>
+          <div class="metric-top">
+            <span id="metricPct" class="metric-pct">80.1%</span>
+            <span id="metricLayerName" class="metric-layer-name">总览</span>
+          </div>
+          <div id="metricSub" class="metric-sub">796.7/994.6G 余198G</div>
+        </div>
+
+        <div class="wire-bar-track" aria-hidden="true">
+          <div id="wireBarFill" class="wire-bar-fill" style="width: 80.1%;"></div>
+        </div>
+
+        <div id="layerPills" class="layer-pills" role="group" aria-label="磁盘分卷层切换"></div>
+      </div>
+    </section>
+
+    <footer class="fig-footer">
+      <span id="liveReadout" class="fig-readout">同步中...</span>
+      <div style="display:flex;align-items:center;gap:3px;flex-shrink:0;">
+        <button id="intervalBtn" type="button" class="interval-toggle" title="切换实测同步周期（5秒/15秒/30秒/暂停）">5s</button>
+        <button id="scanBtn" type="button" class="scan-mini-btn" title="立即从本地采集同步最新磁盘读数">SCAN</button>
+      </div>
+    </footer>
+  </main>
+
+  <script src="./iso-disk.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      let state = window.IsoDiskKernel.cloneDefault();
+      let lastFingerprint = '';
+      let updateTimer = null;
+      let isScanning = false;
+      const stageEl = document.getElementById('isoStage');
+      const pillsEl = document.getElementById('layerPills');
+      const pctEl = document.getElementById('metricPct');
+      const layerNameEl = document.getElementById('metricLayerName');
+      const subEl = document.getElementById('metricSub');
+      const barFillEl = document.getElementById('wireBarFill');
+      const readoutEl = document.getElementById('liveReadout');
+      const badgeEl = document.getElementById('statusBadge');
+      const statusTextEl = document.getElementById('statusText');
+      const scanBtn = document.getElementById('scanBtn');
+      const intervalBtn = document.getElementById('intervalBtn');
+
+      function updateTelemetryOnly() {
+        const active = state.layers.find((l) => l.id === state.activeLayer) || state.layers[0];
+        const isWarn = active.pct >= state.thresholdPct;
+
+        pctEl.textContent = `${active.pct.toFixed(1)}%`;
+        layerNameEl.textContent = active.shortLabel;
+        subEl.textContent = `${active.usedGB.toFixed(1)}/${active.totalGB.toFixed(1)}G 余${active.freeGB.toFixed(0)}G`;
+
+        barFillEl.style.width = `${Math.min(100, Math.max(4, active.pct))}%`;
+        barFillEl.classList.toggle('warn', isWarn);
+
+        badgeEl.classList.toggle('warn', isWarn);
+        const cleanGB = state.cleanupSummary && Number(state.cleanupSummary.totalCleanableGB) > 0
+          ? Number(state.cleanupSummary.totalCleanableGB)
+          : 0;
+        if (cleanGB > 0) {
+          const cleanLabel = cleanGB >= 1 ? `${cleanGB.toFixed(1)}G` : `${Math.round(cleanGB * 1000)}M`;
+          statusTextEl.textContent = isWarn ? `≥${state.thresholdPct}% · 清${cleanLabel}` : `可清 ${cleanLabel}`;
+        } else {
+          statusTextEl.textContent = isWarn ? `≥${state.thresholdPct}% 预警` : `余 ${active.freeGB.toFixed(0)}G`;
+        }
+
+        const btnPills = pillsEl.querySelectorAll('[data-layer-btn]');
+        if (btnPills.length === state.layers.length) {
+          state.layers.forEach((layer, idx) => {
+            const btn = btnPills[idx];
+            const pctSpan = btn.querySelector('.layer-btn-pct');
+            if (pctSpan) pctSpan.textContent = `${Math.round(layer.pct)}%`;
+            btn.classList.toggle('active', layer.id === state.activeLayer);
+          });
+        }
+
+        const timePart = state.lastUpdated ? String(state.lastUpdated).slice(11, 19) : '';
+        readoutEl.textContent = timePart
+          ? `${timePart} · ${active.code.toLowerCase()} ${active.usedGB.toFixed(1)}g`
+          : window.IsoDiskKernel.formatReadout(state);
+        readoutEl.title = `扫描 #${state.scanCount || 1} · ${state.lastUpdated || ''}${cleanGB > 0 ? ` · 可清理 ${cleanGB.toFixed(2)} GB` : ''}`;
+      }
+
+      function render(fullSvg = true) {
+        if (fullSvg) {
+          stageEl.innerHTML = window.IsoDiskKernel.buildIsoDiskSvg(state, { compact: true });
+          pillsEl.innerHTML = state.layers
+            .map((layer) => {
+              const activeCls = layer.id === state.activeLayer ? 'active' : '';
+              return `<button type="button" class="layer-btn ${activeCls}" data-layer-btn="${layer.id}">
+                <span>${layer.code}</span>
+                <span class="layer-btn-pct">${Math.round(layer.pct)}%</span>
+              </button>`;
+            })
+            .join('');
+        }
+        updateTelemetryOnly();
+        lastFingerprint = window.IsoDiskKernel.getStateFingerprint(state);
+      }
+
+      // Render immediately with default baseline before async storage sync
+      render(true);
+
+      // Keep polling frequency aligned with user setting while avoiding drift:
+      // backend samples at `intervalSec`, UI checks live-metrics.json at min(intervalSec, 2s)
+      // when autoRunning is true so updates appear promptly after each cycle.
+      function getUiPollMs(intervalSec) {
+        if (intervalSec <= 5) return 2000;
+        if (intervalSec <= 15) return 3000;
+        return 5000;
+      }
+
+      async function refreshFromDaemon(forceSvg = false) {
+        const latest = await window.IsoDiskKernel.loadState();
+        const nextFp = window.IsoDiskKernel.getStateFingerprint(latest);
+        const layerChanged = latest.activeLayer !== state.activeLayer;
+        const intervalChanged =
+          latest.autoIntervalSec !== state.autoIntervalSec || latest.autoRunning !== state.autoRunning;
+        state = latest;
+        if (intervalChanged) {
+          setupTimer();
+        }
+        if (forceSvg || nextFp !== lastFingerprint) {
+          render(forceSvg || layerChanged);
+          await window.IsoDiskKernel.updateBadge(state);
+        }
+        return state;
+      }
+
+      async function selectLayer(layerId) {
+        if (!state.layers.some((l) => l.id === layerId)) return;
+        state.activeLayer = layerId;
+        render(true);
+        const part = stageEl.querySelector(`[data-layer="${layerId}"]`);
+        if (part) {
+          part.classList.add('down');
+          setTimeout(() => part.classList.remove('down'), 120);
+        }
+        await window.IsoDiskKernel.savePrefs(state);
+      }
+
+      async function triggerScan(rotateLayer = false) {
+        if (isScanning) return;
+        isScanning = true;
+        scanBtn.textContent = '...';
+        scanBtn.disabled = true;
+        try {
+          if (rotateLayer) {
+            const order = state.layers.map((l) => l.id);
+            const idx = order.indexOf(state.activeLayer);
+            state.activeLayer = order[(idx + 1) % order.length];
+            await window.IsoDiskKernel.savePrefs(state);
+          }
+          const result = await window.IsoDiskKernel.triggerLiveScan({ preferTriggerFile: true });
+          state = result.state;
+          render(true);
+          await window.IsoDiskKernel.updateBadge(state);
+          if (result.scanned) {
+            const timePart = state.lastUpdated ? String(state.lastUpdated).slice(11, 19) : '';
+            readoutEl.textContent = `#${state.scanCount || 1} ${timePart} · ${state.usedPct.toFixed(1)}%`;
+          } else {
+            readoutEl.textContent = `采集服务未就绪 · ${state.lastUpdated ? String(state.lastUpdated).slice(11, 19) : '离线'}`;
+          }
+        } finally {
+          isScanning = false;
+          scanBtn.textContent = 'SCAN';
+          scanBtn.disabled = false;
+        }
+      }
+
+      function setupTimer() {
+        if (updateTimer) {
+          clearInterval(updateTimer);
+          updateTimer = null;
+        }
+
+        const intervalSec = Number(state.autoIntervalSec) || 5;
+        if (!state.autoRunning || intervalSec <= 0) {
+          intervalBtn.textContent = '暂停';
+          intervalBtn.title = '当前自动采集已暂停，点击恢复（5秒）';
+          return;
+        }
+
+        intervalBtn.textContent = `${intervalSec}s`;
+        intervalBtn.title = `实测采集周期：${intervalSec}秒（点击切换 5s/15s/30s/暂停）`;
+
+        // 后台服务按 intervalSec 采集写入 live-metrics.json，前端轻量检查增量变化并刷新 UI
+        updateTimer = setInterval(() => {
+          if (document.hidden) return;
+          refreshFromDaemon(false);
+        }, getUiPollMs(intervalSec));
+      }
+
+      // 页面恢复可见时立即拉取一次最新实测读数
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          refreshFromDaemon(false);
+        }
+      });
+
+      intervalBtn.addEventListener('click', async () => {
+        const cycle = [5, 15, 30, 0];
+        const current = state.autoRunning ? (Number(state.autoIntervalSec) || 5) : 0;
+        const idx = cycle.indexOf(current);
+        const nextIdx = (idx === -1 ? 0 : idx + 1) % cycle.length;
+        const nextVal = cycle[nextIdx];
+        if (nextVal === 0) {
+          state.autoRunning = false;
+        } else {
+          state.autoRunning = true;
+          state.autoIntervalSec = nextVal;
+        }
+        setupTimer();
+        await window.IsoDiskKernel.savePrefs(state);
+      });
+
+      stageEl.addEventListener('click', (e) => {
+        const actionEl = e.target.closest('[data-action="scan"]');
+        if (actionEl) {
+          triggerScan(true);
+          return;
+        }
+        const partEl = e.target.closest('[data-layer]');
+        if (partEl && partEl.dataset.layer) {
+          selectLayer(partEl.dataset.layer);
+        }
+      });
+
+      pillsEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-layer-btn]');
+        if (btn && btn.dataset.layerBtn) {
+          selectLayer(btn.dataset.layerBtn);
+        }
+      });
+
+      scanBtn.addEventListener('click', () => {
+        triggerScan(false);
+      });
+
+      window.addEventListener('keydown', (e) => {
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+        const keyMap = { '1': 'all', '2': 'data', '3': 'system', '4': 'sim' };
+        if (keyMap[e.key]) {
+          e.preventDefault();
+          selectLayer(keyMap[e.key]);
+        } else if (e.key === ' ' || e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          triggerScan(true);
+        }
+      });
+
+      async function init() {
+        await refreshFromDaemon(true);
+        setupTimer();
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>

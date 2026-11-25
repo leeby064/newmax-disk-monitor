@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 1,
+  "id": "app-d417779e-c5dd-4967-9d9c-ca66382be274",
+  "name": "磁盘监控",
+  "icon": "symbol:memory:forest",
+  "version": "1.0.1",
+  "description": "实时监控本机 APFS 磁盘空间并列出可清理清单。日常清理在侧边栏，另有一个小窗口用于让宿主启动采集服务。严格保护项目打包依赖缓存。",
+  "standard": {
+    "id": "newmax.local-app",
+    "version": "2026.09",
+    "runtimeApi": "^1.0.0",
+    "compatibility": "semver"
+  },
+  "builder": {
+    "status": "needs-review",
+    "currentPhase": "validate",
+    "requirements": [
+      "REQ-1 小窗口加嵌入表面：保留 entry.frontend 指向紧凑服务窗口 src/boot.html，仅用于让宿主启动采集服务；日常清理仍在 sidebar/below-nav 打开的 dock 侧边栏和 info-card/section 信息面板，信息面板保持透明底色与 252×160px 零边距对齐。",
+      "REQ-2 基于 iso-figure 的 2.5D 等距线框磁盘监控与实时采集：通过宿主托管本地服务 disk-collector 定时按设置周期采集真实 APFS 磁盘空间，并在信息面板与侧边栏中支持点击 2.5D 盘片切换分卷和手动触发扫描。",
+      "REQ-3 智能可清理清单与依赖缓存保护：后台扫描并列出可安全清理的打包临时目录（.next/out/dist/build/release 解包目录）、历史版本打包产物（默认保留最新版本）、旧下载安装包与应用日志，严格排除并明示受保护的依赖与打包缓存（node_modules、.npm、pnpm、Yarn、Electron、electron-builder、uv、pip、Go、Cargo、Gradle、CocoaPods、Homebrew）。",
+      "REQ-4 侧边栏一站式清理与设置持久化：后台只负责扫描。侧边栏勾选后，在运行中宿主确认 resource-operations-v3 且 oneShotChanges 含 trash 与 trashDirectory 时，直接把绝对路径交给 window.newmaxApp.resources.applyTargets，由 NewMax 主窗口确认完整路径后移入废纸篓；失败不回退到选文件夹或后台清理。设置包含自动采集周期、告警阈值、历史版本保留份数、扫描目录列表和安全停止采集服务，并通过 window.newmaxApp.data 与 user-prefs.json 持久化。"
+    ],
+    "assumptions": [
+      "日常清理在侧边栏和信息面板。另保留一个紧凑独立窗口，只为让宿主以系统用户权限启动 disk-collector；关掉窗口不停止服务。",
+      "移入废纸篓只走 window.newmaxApp.resources。采集服务继续扫描，不获得用户目录写权限，也不再执行清理。"
+    ],
+    "acceptanceCriteria": [
+      "应用同时提供用于启动采集服务的小窗口（entry.frontend 为 src/boot.html）以及侧边栏面板和信息面板；信息面板视图（summary）在 252×160px 容器中 html、body 与 #app 均为透明背景（transparent）且 padding/margin 为 0，无横向或纵向裁切溢出。",
+      "2.5D 磁盘线框采用 iso-figure 矩阵投影内核渲染多层立面（含 matrix 变换与 non-scaling-stroke 线框），信息面板展示实时容量与可清理估算，点击盘片/分卷按钮与 SCAN 能实时更新读数。",
+      "侧边栏面板（board@dock，涵盖 240px 窄宽至 420px 默认宽）展示磁盘占用、分类可清理清单及受保护依赖缓存声明，支持筛选、勾选和重新扫描；运行中宿主确认 resource-operations-v3 且 oneShotChanges 含 trash 与 trashDirectory 后，勾选内容按绝对路径交给 window.newmaxApp.resources.applyTargets，由 NewMax 确认完整路径后移入废纸篓，不再先选文件夹，失败不回退后台清理，且不列出任何项目依赖缓存目录。",
+      "侧边栏「设置」分区支持调整告警阈值、自动采集周期、历史版本保留数及扫描根目录，修改后通过 window.newmaxApp.data 与 user-prefs.json 持久化保存并在重载后保持一致。"
+    ],
+    "buildTrace": [
+      {
+        "id": "acceptance-requirements",
+        "phase": "requirements",
+        "title": "Requirements accepted",
+        "status": "completed",
+        "summary": "4 acceptance criteria were checked against the app."
+      },
+      {
+        "id": "acceptance-plan",
+        "phase": "plan",
+        "title": "Build plan present",
+        "status": "completed",
+        "summary": "The app contract, including BUILD_PLAN.md, passed validation at acceptance."
+      },
+      {
+        "id": "acceptance-generate",
+        "phase": "generate",
+        "title": "Source generated",
+        "status": "completed",
+        "summary": "Accepted source revision 8474e0edbfa15103af6c254a60259d888ca9f5bf655eaf13f361cb002c1c7074."
+      },
+      {
+        "id": "acceptance-run",
+        "phase": "run",
+        "title": "Previewed in the real runtime",
+        "status": "completed",
+        "summary": "Inspected: window, board@dock, summary@info-card/section."
+      },
+      {
+        "id": "acceptance-validate",
+        "phase": "validate",
+        "title": "Acceptance checks passed",
+        "status": "completed",
+        "summary": "Every acceptance criterion has a passed check with observed evidence in ACCEPTANCE.md."
+      },
+      {
+        "id": "acceptance-snapshot",
+        "phase": "snapshot",
+        "title": "Accepted snapshot recorded",
+        "status": "completed",
+        "summary": "Acceptance is bound to source revision 8474e0edbfa15103af6c254a60259d888ca9f5bf655eaf13f361cb002c1c7074."
+      }
+    ]
+  },
+  "runtime": "^1.0.0",
+  "entry": {
+    "frontend": "src/boot.html"
+  },
+  "permissions": [
+    "data.kv",
+    "files.appData",
+    "notifications",
+    "resources.read",
+    "resources.change"
+  ],
+  "surfaces": {
+    "launchers": [
+      {
+        "id": "main-launcher",
+        "title": "磁盘监控与清理",
+        "icon": "symbol:memory:forest",
+        "slots": [
+          "sidebar/below-nav"
+        ],
+        "opens": {
+          "kind": "panel",
+          "id": "board"
+        },
+        "badge": true
+      }
+    ],
+    "panels": [
+      {
+        "id": "board",
+        "title": "磁盘监控与清理",
+        "entry": "src/panel.html",
+        "sizes": [
+          "m"
+        ],
+        "hosts": [
+          "dock"
+        ]
+      }
+    ],
+    "inline": [
+      {
+        "id": "summary",
+        "entry": "src/summary.html",
+        "slots": [
+          "info-card/section"
+        ],
+        "card": {
+          "variant": "flat",
+          "background": {
+            "light": "transparent",
+            "dark": "transparent"
+          },
+          "border": {
+            "light": "transparent",
+            "dark": "transparent"
+          }
+        }
+      }
+    ]
+  },
+  "requiredCapabilities": [
+    "data.kv",
+    "files.appData",
+    "notifications",
+    "resources.read",
+    "resources.change"
+  ],
+  "shortcuts": [
+    {
+      "surface": "newmax.sidebar",
+      "title": "磁盘监控",
+      "icon": "symbol:memory:forest"
+    }
+  ],
+  "services": [
+    {
+      "id": "disk-collector",
+      "name": "本地 APFS 磁盘实时采集服务",
+      "executable": {
+        "darwin": ".venv/bin/python3",
+        "linux": ".venv/bin/python3",
+        "win32": ".venv/Scripts/python.exe"
+      },
+      "entry": "backend/disk_service.py",
+      "args": [
+        "--data-dir",
+        "${appData}",
+        "--app-id",
+        "${appId}"
+      ],
+      "readiness": {
+        "connectionFile": "connection.json",
+        "healthPath": "/health"
+      },
+      "startupTimeoutMs": 15000
+    }
+  ],
+  "createdAt": "2026-11-07T11:34:24.728Z",
+  "updatedAt": "2026-11-24T12:04:57.748Z"
+}
